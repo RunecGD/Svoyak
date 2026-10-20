@@ -4,6 +4,7 @@ import path from 'node:path';
 import {WebSocketServer,WebSocket} from 'ws';
 import {handleGame} from './game.mjs';
 import {createAuth} from './auth.mjs';
+import {imageRoute} from './images.mjs';
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.woff2':'font/woff2'};
 export function createApp({db,password,secret,production=true,dist=path.resolve('dist'),publish,onSubscribe}){
  const auth=createAuth(password,secret,production),wss=new WebSocketServer({noServer:true,maxPayload:4096}),limits=new Map();
@@ -26,6 +27,7 @@ export function createApp({db,password,secret,production=true,dist=path.resolve(
     if(!sameOrigin(req))return json(res,403,{error:'Недопустимый источник'});
     if(!limit('api:'+ip(req),6000,60000))return json(res,429,{error:'Слишком много запросов'});
     if(url.pathname==='/api/session'&&req.method==='GET')return json(res,200,{authenticated:!!auth.user(req.headers)});
+    if(url.pathname==='/api/images'||url.pathname.startsWith('/api/images/'))return await imageRoute(req,res,url.pathname,db,auth.user(req.headers),json);
     if(req.method!=='POST')return json(res,405,{error:'Метод не поддерживается'});
     if(url.pathname==='/api/login'){
      if(!limit('login:'+ip(req),10,600000))return json(res,429,{error:'Слишком много попыток. Подождите 10 минут.'});

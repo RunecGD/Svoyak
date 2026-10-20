@@ -1,7 +1,8 @@
+import {validateImages} from './images.mjs';
 const reply = (x, status = 200) => Response.json(x, { status, headers: { 'Cache-Control': 'no-store' } });
 function fail(message) { throw Error(message); }
 function pack(x) { if (!Array.isArray(x) || x.length < 1 || x.length > 12)
-    fail('Нужно от 1 до 12 категорий'); return x.map((c) => ({ id: crypto.randomUUID(), name: String(c.name || '').trim().slice(0, 60) || 'Без названия', questions: (Array.isArray(c.questions) ? c.questions : []).slice(0, 8).map((q) => ({ id: crypto.randomUUID(), value: Math.max(1, Math.min(10000, Math.trunc(Number(q.value) || 100))), text: String(q.text || '').slice(0, 3000), answer: String(q.answer || '').slice(0, 2000), used: false })) })); }
+    fail('Нужно от 1 до 12 категорий'); return x.map((c) => ({ id: crypto.randomUUID(), name: String(c.name || '').trim().slice(0, 60) || 'Без названия', questions: (Array.isArray(c.questions) ? c.questions : []).slice(0, 8).map((q) => ({ id: crypto.randomUUID(), value: Math.max(1, Math.min(10000, Math.trunc(Number(q.value) || 100))), text: String(q.text || '').slice(0, 3000), answer: String(q.answer || '').slice(0, 2000), imageId: typeof q.imageId === 'string' && /^[a-f0-9]{64}$/.test(q.imageId) ? q.imageId : null, used: false })) })); }
 function view(r, s, host, p) { if (host)
     return { ...s, players: s.players.map(({ token, ...p }) => p), id: r.id, invite: r.invite, version: r.version, host: true }; return { id: r.id, title: s.title, phase: s.phase, gate: s.gate, epoch: s.epoch, winner: s.winner, players: s.players.map(({ token, ...p }) => p), me: p?.id, blocked: s.blocked, host: false, version: r.version }; }
 export async function handleGame(req, db, uid) {
@@ -18,6 +19,7 @@ export async function handleGame(req, db, uid) {
                 return reply({ error: 'Войдите как ведущий, чтобы создать игру', signin: true }, 401);
             const id = crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase(), invite = crypto.randomUUID();
             const s = { title: String(b.title || 'Вечер в своей компании').slice(0, 80), categories: pack(b.categories), players: [], phase: 'lobby', gate: 'closed', epoch: 0, active: null, winner: null, blocked: [], history: [] };
+            await validateImages(db,s.categories,uid);
             await db.prepare('INSERT INTO rooms (id,owner,invite,data,version) VALUES (?,?,?,?,0)').bind(id, uid, invite, JSON.stringify(s)).run();
             return reply(view({ id, invite, version: 0 }, s, true, null));
         }
@@ -77,6 +79,7 @@ export async function handleGame(req, db, uid) {
                         if (s.phase !== 'lobby')
                             fail('Редактирование доступно до начала игры');
                         s.categories = pack(b.categories);
+                        await validateImages(db,s.categories,uid);
                         s.title = String(b.title || s.title).slice(0, 80);
                     }
                     else if (b.action === 'start') {
