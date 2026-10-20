@@ -1,0 +1,35 @@
+# Paid always-on service + durable PostgreSQL. Review Render's cost before creation.
+services:
+  - type: web
+    name: svoyak
+    runtime: docker
+    plan: 0.5c-512mb
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeployTrigger: off
+    numInstances: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: svoyak-db
+          property: connectionString
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+
+databases:
+  - name: svoyak-db
+    plan: 0.1c-256mb
+    region: frankfurt
+    postgresMajorVersion: "17"
+    diskSizeGB: 1
+    databaseName: svoyak
+    user: svoyak
+    ipAllowList: []
